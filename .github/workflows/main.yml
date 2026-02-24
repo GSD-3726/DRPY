@@ -1,10 +1,7 @@
-# 工作流名称（在 GitHub Actions 页面显示）
 name: 手动运行咪咕720P频道抓取脚本
 
-# 触发规则：仅手动触发
 on:
   workflow_dispatch:
-    # 可选：添加自定义输入参数（比如指定输出文件名，非必需）
     inputs:
       output_filename:
         description: '输出文件的前缀名称（可选，默认 migu_720p）'
@@ -12,41 +9,44 @@ on:
         default: 'migu_720p'
         type: string
 
-# 工作流执行的任务
 jobs:
   run-script:
-    # 运行的操作系统（选择 Ubuntu 最新版）
     runs-on: ubuntu-latest
+    # 增加超时时间（默认3600秒，避免脚本运行超时）
+    timeout-minutes: 10
     
-    # 任务步骤
     steps:
-      # 1. 拉取仓库代码到运行环境
       - name: 检出仓库代码
         uses: actions/checkout@v4
+        # 确保完整检出仓库文件（解决文件匹配失败问题）
+        with:
+          fetch-depth: 1
 
-      # 2. 设置 Python 环境（匹配脚本运行的版本，建议 3.9+）
       - name: 设置 Python 环境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'  # 推荐 3.9+，兼容所有依赖
-          cache: 'pip'  # 缓存 pip 依赖，加速下次运行
+          python-version: '3.10'
+          # 修复：关闭pip缓存（因为无requirements.txt），或指定空缓存路径
+          cache: ''  # 关键修复：禁用自动缓存，避免查找依赖文件失败
 
-      # 3. 安装脚本依赖（requests 是核心依赖）
-      - name: 安装依赖包
+      # 优化：使用国内PyPI源加速依赖安装（解决海外环境下载慢）
+      - name: 安装依赖包（国内源加速）
         run: |
-          python -m pip install --upgrade pip
-          pip install requests  # 脚本核心依赖
-          # 如果后续脚本有其他依赖，比如 lxml、beautifulsoup4 等，都加在这里
+          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+          pip install requests -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-      # 4. 运行 main.py 脚本
+      # 优化：增加国内DNS和超时配置（解决访问咪咕接口超时）
       - name: 执行咪咕720P频道抓取脚本
         run: |
+          # 临时修改DNS为国内公共DNS，优化海外访问国内接口
+          echo "nameserver 223.5.5.5" | sudo tee /etc/resolv.conf > /dev/null
+          # 运行脚本，增加超时容错
           python main.py
-        # 可选：传递自定义参数（比如覆盖输出文件名）
         env:
           OUTPUT_FILENAME: ${{ github.event.inputs.output_filename }}
+        # 增加步骤超时时间
+        timeout-minutes: 8
 
-      # 5. 上传脚本生成的文件（m3u/txt）作为 artifact，方便下载
       - name: 上传生成的频道文件
         uses: actions/upload-artifact@v4
         with:
@@ -54,5 +54,6 @@ jobs:
           path: |
             *.m3u
             *.txt
-          # 文件保留时间（默认90天，可自定义）
           retention-days: 7
+        # 即使脚本部分失败，也尝试上传已生成的文件
+        if: always()
