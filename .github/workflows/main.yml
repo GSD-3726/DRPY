@@ -1,0 +1,58 @@
+# 工作流名称（在 GitHub Actions 页面显示）
+name: 手动运行咪咕720P频道抓取脚本
+
+# 触发规则：仅手动触发
+on:
+  workflow_dispatch:
+    # 可选：添加自定义输入参数（比如指定输出文件名，非必需）
+    inputs:
+      output_filename:
+        description: '输出文件的前缀名称（可选，默认 migu_720p）'
+        required: false
+        default: 'migu_720p'
+        type: string
+
+# 工作流执行的任务
+jobs:
+  run-script:
+    # 运行的操作系统（选择 Ubuntu 最新版）
+    runs-on: ubuntu-latest
+    
+    # 任务步骤
+    steps:
+      # 1. 拉取仓库代码到运行环境
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      # 2. 设置 Python 环境（匹配脚本运行的版本，建议 3.9+）
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'  # 推荐 3.9+，兼容所有依赖
+          cache: 'pip'  # 缓存 pip 依赖，加速下次运行
+
+      # 3. 安装脚本依赖（requests 是核心依赖）
+      - name: 安装依赖包
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests  # 脚本核心依赖
+          # 如果后续脚本有其他依赖，比如 lxml、beautifulsoup4 等，都加在这里
+
+      # 4. 运行 main.py 脚本
+      - name: 执行咪咕720P频道抓取脚本
+        run: |
+          python main.py
+        # 可选：传递自定义参数（比如覆盖输出文件名）
+        env:
+          OUTPUT_FILENAME: ${{ github.event.inputs.output_filename }}
+
+      # 5. 上传脚本生成的文件（m3u/txt）作为 artifact，方便下载
+      - name: 上传生成的频道文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: 咪咕720P频道文件
+          path: |
+            *.m3u
+            *.txt
+          # 文件保留时间（默认90天，可自定义）
+          retention-days: 7
