@@ -1,0 +1,23 @@
+name: FFmpeg 并发测速测试
+on:
+  workflow_dispatch:  # 允许手动触发测试
+  push:
+    branches: [ main ]  # 也可以设置为推送到 main 分支时自动测试
+
+jobs:
+  speed-test:
+    runs-on: ubuntu-latest  # 使用 GitHub 提供的 Ubuntu 环境
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 FFmpeg 和 Python 依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg  # 安装 FFmpeg
+          python3 -m pip install --upgrade pip
+
+      - name: 运行并发测速脚本
+        run: python3 ffmpeg_speed_test.py  # 执行测试脚本
+        env:
+          TZ: Asia/Shanghai  # 设置时区为中国时间（可选）
